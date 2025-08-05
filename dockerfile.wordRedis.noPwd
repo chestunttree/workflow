@@ -1,0 +1,8 @@
+FROM redis:6
+
+
+WORKDIR /redis
+
+# USER redis
+EXPOSE 6379
+CMD ["redis-server", ""]

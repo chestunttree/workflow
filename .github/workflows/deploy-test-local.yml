@@ -1,0 +1,56 @@
+name: Nestjs Work Service Deploy to test
+on:
+  workflow_dispatch:               # 手动触发[3](@ref)
+    inputs:
+      tag:
+        description: '备注'
+        required: false
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Registry
+        run: docker login -u ${{ secrets.SWR_ACCESS_KEY }} -p ${{ secrets.SWR_SECRET_KEY }} ${{ secrets.SWR_URL }}
+
+      - name: Build image
+        run: |
+          docker build \
+            -f ./Dockerfile/dockerfile \
+            -t ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }} \
+            --build-arg ENV=test \
+            .
+
+      - name: Push image
+        run: docker push ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }}
+
+  deploy-to-server:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH to Huawei Cloud Server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_SERVER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            # 拉取镜像
+            docker pull ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }}
+
+            # 检查容器是否存在，存在则停止并删除
+            if docker inspect ${{ vars.NEST_CONTAINER }}-test >/dev/null 2>&1; then
+              echo "停止并删除旧容器..."
+              docker stop ${{ vars.NEST_CONTAINER }}-test
+              docker rm ${{ vars.NEST_CONTAINER }}-test
+            else
+              echo "容器不存在，跳过停止和删除步骤"
+            fi
+
+            # 启动新容器
+            docker run -d --name ${{ vars.NEST_CONTAINER }}-test \
+              -p 3002:3000 \
+              ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }}

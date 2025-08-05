@@ -1,0 +1,22 @@
+FROM redis:5.0.7 
+
+
+WORKDIR /redis
+
+COPY redis.conf /etc/redis/redis.conf
+
+# 安全加固配置（禁用危险命令）
+# RUN echo "rename-command FLUSHALL ''" >> /redis/redis.conf && \
+#     echo "rename-command FLUSHDB ''" >> /redis/redis.conf && \
+#     echo "rename-command CONFIG ''" >> /redis/redis.conf
+
+# 持久化配置（可选）
+# RUN echo "save 900 1" >> /redis/redis.conf && \
+#     echo "save 300 10" >> /redis/redis.conf
+
+# 创建数据目录并设置权限
+# RUN mkdir -p /data && chown redis:redis /data
+
+# USER redis
+EXPOSE 6379
+CMD ["redis-server", "/etc/redis/redis.conf"]

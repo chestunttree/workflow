@@ -1,0 +1,63 @@
+name: 本地试一下工作流
+on:
+  workflow_dispatch:               # 手动触发[3](@ref)
+    inputs:
+
+jobs:
+  create-file-and-run-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库代码  # 必须添加，否则无法找到Dockerfile
+        uses: actions/checkout@v4
+      - name: 创建个文件试试
+        run: |
+          # 使用 echo 将变量内容写入文件（覆盖模式）
+          echo "这是一段文本， 试试看能不能创建成功！！" > release.txt
+          # 验证文件内容（可选调试步骤）
+          cat release.txt
+      # - name: has docker
+      #   run: docker images
+      - name: run dockerfile
+        run: |
+          docker build \
+            -f ./dockerfile \
+            -t test-one \
+            .
+  run-docker-image:
+    runs-on: ubuntu-latest
+    needs: create-file-and-run-docker
+    steps:
+      - name: 判断是否有重复容器存在
+        run: |
+          # 检查容器是否存在，存在则停止并删除
+          if docker inspect test-one-container >/dev/null 2>&1; then
+            echo "停止并删除旧容器..."
+            docker stop test-one-container
+            docker rm test-one-container
+          else
+            echo "容器不存在，跳过停止和删除步骤"
+          fi 
+      - name: docker Build
+        run: |
+          docker run -d -p 2887:2887 \
+            --name test-one-container \
+            test-one
+  # build-and-push:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+
+  #     - name: Login to Registry
+  #       run: docker login -u ${{ secrets.SWR_ACCESS_KEY }} -p ${{ secrets.SWR_SECRET_KEY }} ${{ secrets.SWR_URL }}
+
+  #     - name: Build image
+  #       run: |
+  #         docker build \
+  #           -f ./Dockerfile/dockerfile \
+  #           -t ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }} \
+  #           --build-arg ENV=test \
+  #           .
+
+  #     - name: Push image
+  #       run: docker push ${{ secrets.SWR_URL }}/bookkeeping/nest-app:test-${{ github.run_id }}
